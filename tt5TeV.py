@@ -115,13 +115,118 @@ class Dilepton(Nano5TeVHistoModule):
         name = var + ('_' + ichan if ichan != '' else '')
         return name
 
-    def NewHisto(self, var, chan, nbins, bin0, binN):
+    def NewHisto(self, var, channnel, nbins, bin0, binN):
     ''' Used to create the histos following a structure '''
-        self.CreateTH1F(self.GetName(var, chan), "", nbins, bin0, binN)
+        self.CreateTH1F(self.GetName(var, channel), "", nbins, bin0, binN)
 
-    def GetHisto(self, var, chan):
+    def GetHisto(self, var, channel):
     ''' Get a given histo using the tthisto structure '''
-        return self.obj[self.GetName(var, chan)]
+        return self.obj[self.GetName(var, channel)]
+
+    def createHistos(self):
+    ''' Create all the histos for the analysis '''
+
+        ### Analysis histos
+        for key_chan in channel:
+        ichan = channnel[key_chan]
+
+        # Event
+        self.NewHisto('HT',   ichan, 80, 0, 400)
+        self.NewHisto('MET',  ichan, 30, 0, 150)
+        self.NewHisto('NJets',ichan, 8 ,-0.5, 7.5)
+        self.NewHisto('Btags',ichan, 4 ,-0.5, 3.5)
+        self.NewHisto('Vtx',  ichan, 10, -0.5, 9.5)
+        self.NewHisto('NBtagNJets', ichan, 7, -0.5, 6.5)
+        self.NewHisto('NBtagNJets_3bins', ichan, 3, -0.5, 2.5)
+        # Leptons
+        self.NewHisto('Lep0Pt', ichan, 20, 20, 120)
+        self.NewHisto('Lep1Pt', ichan, 16, 10, 90)
+        self.NewHisto('Lep0Eta', ichan, 50, -2.5, 2.5)
+        self.NewHisto('Lep1Eta', ichan, 50, -2.5, 2.5)
+        self.NewHisto('Lep0Phi', ichan, 20, -1, 1)
+        self.NewHisto('Lep1Phi', ichan, 20, -1, 1)
+        self.NewHisto('DilepPt', ichan, 40, 0, 200)
+        self.NewHisto('InvMass', ichan, 60, 0, 300)
+        self.NewHisto('DYMass',  ichan, 200, 70, 110)
+        self.NewHisto('DYMassBB',  ichan, 200, 70, 110)
+        self.NewHisto('DYMassBE',  ichan, 200, 70, 110)
+        self.NewHisto('DYMassEB',  ichan, 200, 70, 110)
+        self.NewHisto('DYMassEE',  ichan, 200, 70, 110)
+        self.NewHisto('DeltaPhi',  ichan, 20, 0, 1)
+        if ichan == chan[ch.ElMu]:
+           self.NewHisto('ElecEta', 'ElMu', 50, -2.5, 2.5)
+           self.NewHisto('MuonEta', 'ElMu', 50, -2.5, 2.5)
+           self.NewHisto('ElecPt', 'ElMu', 20, 10, 110)
+           self.NewHisto('MuonPt', 'ElMu', 20, 10, 110)
+           self.NewHisto('ElecPhi', 'ElMu', 20, -1, 1)
+           self.NewHisto('MuonPhi', 'ElMu', 20, -1, 1)
+
+    def FillHistograms(self, leptons, jets, pmet, ich, ilev, isys):
+    ''' Fill all the histograms. Take the inputs from lepton list, jet list, pmet '''
+        if self.SS: return               # Do not fill histograms for same-sign events
+        if not len(leptons) >= 2: return # Just in case
+    
+        # Re-calculate the observables
+        lep0  = leptons[0]; lep1 = leptons[1]
+        l0pt  = lep0.Pt();  l1pt  = lep1.Pt()
+        l0eta = lep0.Eta(); l1eta = lep1.Eta()
+        l0phi = lep0.Phi(); l1phi = lep1.Phi()
+        dphi  = DeltaPhi(lep0, lep1)
+        mll   = InvMass(lep0, lep1)
+        dipt  = DiPt(lep0, lep1)
+        mupt  = 0; elpt  = 0
+        mueta = 0; eleta = 0
+        muphi = 0; elphi = 0
+        if ich == channel.ElMu:
+           if lep0.IsMuon():
+           mu = lep0
+           el = lep1
+        else:
+           mu = lep1
+           el = lep0
+        elpt  = el.Pt();  mupt  = mu.Pt()
+        eleta = el.Eta(); mueta = mu.Eta()
+        elphi = el.Phi(); muphi = mu.Phi()
+          
+        met = pmet.Pt()
+        ht = 0; 
+   
+    
+        ### Fill the histograms
+        #if ich == ch.ElMu and ilev == lev.dilepton: print 'Syst = ', isys, ', weight = ', self.weight
+        self.GetHisto('HT',   ich).Fill(ht)
+        self.GetHisto('MET',  ich).Fill(met)
+        self.GetHisto('NJets',ich).Fill(njet)
+        self.GetHisto('Btags',ich).Fill(nbtag)
+        self.GetHisto('Vtx',  ich).Fill(self.nvtx)
+        self.GetHisto("InvMass", ich, ).Fill(mll)
+
+    
+       # Leptons
+       self.GetHisto('Lep0Pt', ich).Fill(l0pt)
+       self.GetHisto('Lep1Pt', ich).Fill(l1pt)
+       self.GetHisto('Lep0Eta', ich).Fill(l0eta)
+       self.GetHisto('Lep1Eta', ich).Fill(l1eta)
+       self.GetHisto('Lep0Phi', ich).Fill(l0phi/3.141592)
+       self.GetHisto('Lep1Phi', ich).Fill(l1phi/3.141592)
+       self.GetHisto('DilepPt', ich).Fill(dipt, self.weight)
+       self.GetHisto('DeltaPhi',  ich).Fill(dphi/3.141592)
+       self.GetHisto('InvMass', ich).Fill(mll, self.weight)
+       if mll > 70 and mll < 110: 
+          self.GetHisto('DYMass',  ich).Fill(mll)
+       l0eta = abs(l0eta); l1eta = abs(l1eta)
+       if ich == chan.ElEl:
+          if   l0eta <= 1.479 and l1eta <= 1.479: self.GetHisto('DYMassBB',  ich).Fill(mll)
+          elif l0eta <= 1.479 and l1eta  > 1.479: self.GetHisto('DYMassBE',  ich).Fill(mll)
+          elif l0eta  > 1.479 and l1eta <= 1.479: self.GetHisto('DYMassEB',  ich).Fill(mll)
+          elif l0eta  > 1.479 and l1eta  > 1.479: self.GetHisto('DYMassEE',  ich).Fill(mll)
+      if ich == chan.ElMu:
+         self.GetHisto('ElecEta', ich).Fill(eleta)
+         self.GetHisto('ElecPt',  ich).Fill(elpt)
+         self.GetHisto('ElecPhi', ich).Fill(elphi)
+         self.GetHisto('MuonEta', ich).Fill(mueta)
+         self.GetHisto('MuonPt',  ich).Fill(mupt)
+         self.GetHisto('MuonPhi', ich).Fill(muphi)
 
 
         muons = op.select(t.Muon, lambda mu : mu.pt > 20.)

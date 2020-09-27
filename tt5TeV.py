@@ -90,6 +90,12 @@ class HelloWorld(Nano5TeVHistoModule):
 
         return plots
 
+class chan():
+    ElEl =1
+    MuMu =2
+    ElMu =3
+channel = {chan.ElEl:'ElEl', chan.MuMu:'MuMu',chan.ElMu:'ElMu'}
+
 class Dilepton(Nano5TeVHistoModule):
     def definePlots(self, t, noSel, sample=None, sampleCfg=None):
         from bamboo.plots import Plot, CutFlowReport, SummedPlot
@@ -102,6 +108,21 @@ class Dilepton(Nano5TeVHistoModule):
         noSel = noSel.refine("trig", cut=op.OR(t.HLT.HIL3DoubleMu0, t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ))
 
         plots = []
+    
+    def GetName(self, var, ichan):
+    ''' Crafts the name for a histo '''
+        if isinstance(ichan,  int): ichan  = channel[ichan]
+        name = var + ('_' + ichan if ichan != '' else '')
+        return name
+
+    def NewHisto(self, var, chan, nbins, bin0, binN):
+    ''' Used to create the histos following a structure '''
+        self.CreateTH1F(self.GetName(var, chan), "", nbins, bin0, binN)
+
+    def GetHisto(self, var, chan):
+    ''' Get a given histo using the tthisto structure '''
+        return self.obj[self.GetName(var, chan)]
+
 
         muons = op.select(t.Muon, lambda mu : mu.pt > 20.)
         twoMuSel = noSel.refine("twoMuons", cut=[ op.rng_len(muons) > 1 ])

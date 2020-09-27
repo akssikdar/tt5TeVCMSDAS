@@ -89,3 +89,35 @@ class HelloWorld(Nano5TeVHistoModule):
             "legend-position": [0.2, 0.6, 0.5, 0.9]}))
 
         return plots
+
+class Dilepton(Nano5TeVHistoModule):
+    def definePlots(self, t, noSel, sample=None, sampleCfg=None):
+        from bamboo.plots import Plot, CutFlowReport, SummedPlot
+        from bamboo.plots import EquidistantBinning as EqB
+        from bamboo import treefunctions as op
+
+        isMC = self.isMC(sample)
+        if isMC:
+            noSel = noSel.refine("mcWeight", weight=[ t.genWeight ])
+        noSel = noSel.refine("trig", cut=op.OR(t.HLT.HIL3DoubleMu0, t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ))
+
+        plots = []
+
+        muons = op.select(t.Muon, lambda mu : mu.pt > 20.)
+        twoMuSel = noSel.refine("twoMuons", cut=[ op.rng_len(muons) > 1 ])
+        plots.append(Plot.make1D("dimu_M",
+            op.invariant_mass(muons[0].p4, muons[1].p4), twoMuSel, EqB(100, 20., 120.),
+            title="Dimuon invariant mass", plotopts={"show-overflow":False,
+            "legend-position": [0.2, 0.6, 0.5, 0.9]}))
+
+        electrons = op.select(t.Electron, lambda el : el.pt > 22.)
+        twoElSel = noSel.refine("twoElectrons", cut=[ op.rng_len(electrons) > 1 ])
+        plots.append(Plot.make1D("diel_M",
+            op.invariant_mass(electrons[0].p4, electrons[1].p4), twoElSel, EqB(100, 20., 120.),
+            title="Dielectron invariant mass", plotopts={"show-overflow":False,
+            "legend-position": [0.2, 0.6, 0.5, 0.9]}))
+
+
+
+        return plots
+

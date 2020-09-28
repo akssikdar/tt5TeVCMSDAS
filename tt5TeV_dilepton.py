@@ -111,16 +111,29 @@ class DiLepton_A(Nano5TeVHistoModule):
         if isMC:
             noSel = noSel.refine("mcWeight", weight=[ t.genWeight, t.puWeight, t.PrefireWeight ])
             trigCut = op.OR(t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ, t.HLT.HIL3DoubleMu0, t.HLT.HIL3Mu20, t.HLT.HIEle20_WPLoose_Gsf)
+            trigWeight = op.switch(op.OR(t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ, t.HLT.HIL3DoubleMu0), op.c_float(1.),
+                    op.switch(t.HLT.HIL3Mu20, op.c_float(306.913/308.545), op.c_float(264.410/308.545)))
             ## TODO add a correction for prescaled triggers
         else:
             ## suggested trigger order: dielectron, dimuon or single muon, single electron (to minimise loss due to prescales). Electron triggered-events should be taken from the HighEGJet primary datasets, muon-triggered events from the SingleMuon primary datset
+           
+            ### Remove overlap events in datasets -->Not used
+            if not self.isMC(sample):
+            trigSel = noSel.refine("trigAndPrimaryDataset",
+                cut=makeMultiPrimaryDatasetTriggerSelection(sample, {
+                    "DoubleMuon" : [ t.HLT.HIL3DoubleMu0 ],
+                    "DoubleEG"   : t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ,
+                    "MuonEG"     : [ t.HLT.HIL3Mu20, t.HLT.HIEle20_WPLoose_Gsf ]
+              }))
+
+             ###used following 
             pd = sample.split("_")[0]
             if pd == "SingleMuon":
                 ## TODO fill trigger cut
-                trigCut = op.OR(t.HLT.HIL3Mu20,t.HLT.HIL3DoubleMu0)
+                trigCut = op.AND(op.OR(t.HLT.HIL3Mu20,t.HLT.HIL3DoubleMu0), op.NOT(t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ))
             elif pd == "HighEGJet":
                 ## TODO fill trigger cut
-                trigCut = op.OR(t.HLT.HIEle20_WPLoose_Gsf,t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ)
+                trigCut = op.AND(op.OR(t.HLT.HIEle20_WPLoose_Gsf,t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ),op.NOT(op.OR(t.HLT.HIL3Mu20,t.HLT.HIL3DoubleMu0)))
         noSel = noSel.refine("trig", cut=trigCut, weight=trigWeight)
 
         plots = []
@@ -146,6 +159,16 @@ class DiLepton_A(Nano5TeVHistoModule):
 
         nGoodLeptons = op.rng_len(goodLeptons["el"])+op.rng_len(goodLeptons["mu"])
         hasTwoGoodLeptons = noSel.refine("has2Lep", cut=(nGoodLeptons > 1)) # avoid overlap with 1l
+      
+       ### Remove overlap events in datasets -->NEED TO USED
+       if not self.isMC(sample):
+           trigSel = noSel.refine("trigAndPrimaryDataset",
+                cut=makeMultiPrimaryDatasetTriggerSelection(sample, {
+                    "DoubleMuon" : [ t.HLT.HIL3DoubleMu0 ],
+                    "DoubleEG"   : t.HLT.HIEle20_Ele12_CaloIdL_TrackIdL_IsoVL_DZ,
+                    "MuonEG"     : [ t.HLT.HIL3Mu20, t.HLT.HIEle20_WPLoose_Gsf ]
+              }))
+
         jets = op.sort(op.select(t.Jet, lambda j : op.AND(
             j.pt > 25., ## you decide...
             op.abs(j.eta) < 2.4,

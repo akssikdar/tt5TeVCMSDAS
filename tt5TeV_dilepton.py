@@ -3,6 +3,7 @@ from functools import partial
 from bamboo.analysismodules import NanoAODModule, NanoAODHistoModule, NanoAODSkimmerModule
 import os.path
 import bamboo.treedecorators as btd
+import math
 
 class ReadVariableVarWithSuffix(btd.ReadVariableVarWithSuffix):
     def getVarName(self, branchName, collgrpname=None):
@@ -198,4 +199,79 @@ class DiLepton_A(Nano5TeVHistoModule):
 
 
         return plots
+
+    def postProcess(self, taskList, config=None, workdir=None, resultsdir=None):
+        super(DiLepton_A, self).postProcess(taskList, config=config, workdir=workdir, resultsdir=resultsdir)
+        from bamboo.analysisutils import loadPlotIt
+        p_config, samples, plots, systematics, legend = loadPlotIt(config, self.plotList, eras=self.args.eras[1], workdir=workdir, resultsdir=resultsdir, readCounters=self.readCounters, vetoFileAttributes=self.__class__.CustomSampleAttributes, plotDefaults=self.plotDefaults)
+        import IPython
+        plots = { p.name: p for p in plots } # for convenience: turn list into dictionary
+        smpDY = next(smp for smp in samples if smp.name == "DY")
+        hDY_Mmumu = smpDY.getHist(plots["dilepton_mumu_Mll"]).obj # obj gives the TH1D
+        nbin_min   = hDY_Mmumu.FindBin(76)
+        print( f'nbin_min =  {nbin_min}.')
+        nbin_max   = hDY_Mmumu.FindBin(106)
+        print( f'nbin_max =  {nbin_max}.')
+        nbin       =hDY_Mmumu.GetNbinsX()
+        print( f'nbin =  {nbin}.')
+        nevts_mumu_in_mc    = hDY_Mmumu.Integral(nbin_min,nbin_max)
+        nevts_mumu_out_mc  = hDY_Mmumu.Integral(0,nbin_min-1) + hDY_Mmumu.Integral(nbin_max+1,nbin)
+
+        R_outin_mumu = nevts_mumu_out_mc/nevts_mumu_in_mc
+        print( f'R_outin_mumu =  {R_outin_mumu}.')
+
+        # finding kmumu =sqrt(N_mumu_in / N_ee_in)
+        hDY_Melel = smpDY.getHist(plots["dilepton_elel_Mll"]).obj # obj gives the TH1D
+        nevts_elel_in_mc = hDY_Melel.Integral(nbin_min,nbin_max)
+        k_mumu = math.sqrt(nevts_mumu_in_mc/nevts_elel_in_mc)
+        print( f'k_mumu =  {k_mumu}.') 
+
+        print( f'nevts_mumu_in_mc =  {nevts_mumu_in_mc}.')
+        print( f'nevts_elel_in_mc =  {nevts_elel_in_mc}.')
+
+
+        # finding N_mumu_in_data, N_elmu_in_data 
+        obsDY = next(obs for obs in samples if obs.name == "data")
+        hobsDY_Mmumu = obsDY.getHist(plots["dilepton_mumu_Mll"]).obj 
+        nevts_mumu_in_data    = hobsDY_Mmumu.Integral(nbin_min,nbin_max)
+        print( f'nevts_mumu_in_data =  {nevts_mumu_in_data}.')        
+
+        hobsDY_Melmu = obsDY.getHist(plots["dilepton_elmu_Mll"]).obj 
+        nevts_elmu_in_data    = hobsDY_Melmu.Integral(nbin_min,nbin_max)
+        print( f'nevts_elmu_in_data =  {nevts_elmu_in_data}.')
+
+        #calculating N_mumu_out
+        nevts_mumu_out = R_outin_mumu * ( nevts_mumu_in_data - (0.5*nevts_elmu_in_data*k_mumu) )
+        print( f'nevts_mumu_out =  {nevts_mumu_out}.')
+
+        #finding k_elel
+        k_elel = 1/k_mumu
+
+        #
+        hobsDY_Melel = obsDY.getHist(plots["dilepton_elel_Mll"]).obj 
+        nevts_elel_in_data =hobsDY_Melel.Integral(nbin_min,nbin_max)
+        print( f'nevts_elel_in_data =  {nevts_elel_in_data}.')
+
+        #finding R_outin_elel 
+        nevts_elel_out_mc = hDY_Melel.Integral(0,nbin_min-1) + hDY_Melel.Integral(nbin_max+1,nbin)
+        R_outin_elel = nevts_elel_out_mc/nevts_elel_in_mc
+        print( f'R_outin_elel =  {R_outin_elel}.')        
+      
+        #calculating N_elel_out
+        nevts_elel_out = R_outin_elel * ( nevts_elel_in_data - (0.5*nevts_elmu_in_data*k_elel) )
+        print( f'nevts_elel_out =  {nevts_elel_out}.')
+
+        #finding SF_elle   
+        SF_elel = nevts_elel_out/nevts_elel_out_mc
+        print( f'SF_elel =  {SF_elel}.')
+
+        #finding SF_mumu
+        SF_mumu = nevts_mumu_out/nevts_mumu_out_mc
+        print( f'SF_mumu =  {SF_mumu}.')
+
+        #finding SF_elmu 
+        SF_elmu = math.sqrt(SF_elel * SF_mumu)
+        print( f'SF_elmu =  {SF_elmu}.')
+
+
 
